@@ -1,0 +1,12 @@
+# swarmcode (contains Redis address, generated per machine by `swarmcode-mcp init`)
+.mcp.json
+.claude/settings.json
+
+# secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS
+.DS_Store
