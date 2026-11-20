@@ -42,11 +42,11 @@ docs/           ADR, 실험 기록, 장애 리포트
 | --- | --- |
 | 마스터 플랜 | [열기](https://claude.ai/artifact/BeLz7eMMRjYvef8kAG3qtR) |
 | 01 개발 환경과 연동 준비 | [열기](https://claude.ai/artifact/PPdfzW3TExScmWd8F7h1tA) |
-| 02 앱 화면과 결제 흐름 | [열기](https://claude.ai/artifact/A6f4oi14rG9U4xRAdXkTqw) |
-| 03 시스템 아키텍처 | [열기](https://claude.ai/artifact/JqZgFQ8t9RpCPhZAf6UfGk) |
-| 04 주차별 일정과 리스크 | [열기](https://claude.ai/artifact/JnkALgifwKWdR3Njgb3eyf) |
+| 02 프론트엔드와 오픈소스 활용 | [열기](https://claude.ai/artifact/A6f4oi14rG9U4xRAdXkTqw) |
+| 03 기능 범위와 개발 명세 | [열기](https://claude.ai/artifact/JqZgFQ8t9RpCPhZAf6UfGk) |
+| 04 주차별 실행 계획 | [열기](https://claude.ai/artifact/JnkALgifwKWdR3Njgb3eyf) |
 | 05 GitHub 운영 규칙 | [열기](https://claude.ai/artifact/T8N2exV8dkvHcbtSvcBBKq) |
-| 06 실험·장애 훈련·스토리 | [열기](https://claude.ai/artifact/FFTXxVFvdZuKEjw8JjN3dj) |
+| 06 실험과 장애 훈련 명세 | [열기](https://claude.ai/artifact/FFTXxVFvdZuKEjw8JjN3dj) |
 | 07 역할 분담 | [열기](https://claude.ai/artifact/9jVEhFWz2PT7FJP1a6Kd6f) |
 
 ## 일정
