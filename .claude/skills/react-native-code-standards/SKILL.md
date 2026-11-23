@@ -1,13 +1,72 @@
 ---
 name: "react-native-code-standards"
-description: "React Native(Expo 포함) 앱의 범용 코드 표준: 네이밍, 컴포넌트 구조, TypeScript, Clean Architecture·DDD·포트/어댑터, 성능, 테스트. RN 앱 코드(.ts/.tsx)를 작성·리팩터링·리뷰할 때 사용. 디자인·스타일은 제외."
+description: "TIKITAKA 앱(app/, React Native·Expo)의 코드 구조와 작성 규칙집: 네이밍, 컴포넌트 구조, Clean Architecture·DDD·포트/어댑터, 상태와 데이터, 에러 처리, 백엔드 연동, 테스트. app/의 .ts/.tsx 코드를 새로 만들거나 수정·리팩터링·리뷰할 때 사용. pstack의 architect, 구현, 리뷰 단계에서 app/ 코드를 다룰 때도 설계 입력으로 읽는다. 디자인·스타일은 제외."
 ---
 
 # React Native Code Standards
 
-React Native 앱을 확장 가능하고 테스트하기 쉽게 만드는 범용 코드 표준이다. 특정 프로젝트가 아니라 **RN 앱 전반**에 쓰도록 만들었다.
+React Native 앱을 확장 가능하고 테스트하기 쉽게 만드는 코드 표준이다. RN 앱 전반에 쓰는 범용 규칙을 바탕으로, 맨 앞의 "TIKITAKA에서 정한 것"과 "백엔드 연동"에 이 프로젝트의 결정을 더했다.
 
-원본은 alexandrebenkendorf/agents-playbooks의 `code-standards`와 `react-component-structure`(MIT)이다. 원본의 규칙 체계는 유지하고, 웹(DOM·브라우저) 전용 내용을 RN 기준으로 바꿨다.
+원본은 alexandrebenkendorf/agents-playbooks의 `code-standards`와 `react-component-structure`(MIT, [UPSTREAM_LICENSE](UPSTREAM_LICENSE))이다. 원본의 규칙 체계는 유지하고, 웹(DOM·브라우저) 전용 내용을 RN 기준으로 바꿨다.
+
+## TIKITAKA에서 정한 것
+
+범용 규칙이 여러 선택지를 열어 둔 곳은 아래로 고정한다. 바꿀 때는 type:decision Issue와 ADR을 남긴다.
+
+| 주제 | 결정 | 근거 |
+|---|---|---|
+| 앱 기반 | Expo, EAS Build | README 기술 스택 |
+| 라우팅 | Expo Router(`src/app/`). React Navigation 규칙은 적용하지 않는다 | Expo 기본 |
+| 서버 상태 | TanStack Query. 캐시 키 팩토리, `focusManager`·`onlineManager` 연결(9장)을 처음부터 넣는다 | README 기술 스택 |
+| 스타일 | NativeWind. 스타일 값 규칙은 이 문서 범위 밖이다 | README 기술 스택 |
+| 보안 저장소 | `expo-secure-store` | Expo 기본, 9장 |
+| E2E | Maestro, `testID` 기반 | 마스터 플랜 테스트 스택 |
+| 기능 폴더 이름 | 백엔드 컨텍스트와 같게: `auth`, `catalog`, `order`, `payment`, `point` | 같은 개념에 같은 이름(1-5) |
+| 자동 검사 | `app/`을 만들 때 `tsc` strict와 ESLint 레이어 규칙([references/automation.md](references/automation.md))을 처음부터 넣는다 | 규칙을 사람보다 도구가 먼저 잡게(13장) |
+
+**아직 정하지 않은 것** (정할 때까지 괄호 안을 기본값으로 쓴다)
+
+- 단위 테스트 도구(Jest, `jest-expo` 프리셋, React Native Testing Library)
+- 런타임 검증 라이브러리(zod)
+- 엔티티·값 객체 표현(7-6의 두 방식 중 `type` + 순수 함수. pstack `typescript-best-practices`의 판별 유니온과 잘 맞는다)
+- 전역 클라이언트 상태(`useState`와 Context. 전역 스토어 라이브러리는 필요해질 때 정한다)
+
+## 백엔드 연동
+
+백엔드 규칙은 `backend-architecture` 스킬에 있다. 앱은 아래를 맞춘다.
+
+- **용어:** 백엔드 용어 사전(`.claude/skills/backend-architecture/references/contexts.md`)과 같은 단어를 쓴다. 예: 주문번호는 `orderNo`, 결제 키는 `paymentKey`, 회차는 `Schedule`.
+- **에러:** 백엔드 에러 응답은 `{ code, message }`이고 HTTP 상태로 종류가 나뉜다. `core/http` 어댑터에서 아래처럼 `AppError`로 바꾸고, 서버의 `code`(예: `AMOUNT_MISMATCH`)는 `serverCode`로 함께 넘긴다. 화면은 HTTP 상태를 직접 보지 않는다(11장).
+
+  | HTTP | AppErrorCode |
+  |---|---|
+  | 400 | `INVALID` |
+  | 401 | `UNAUTHORIZED` (본문이 없을 수도 있다. Spring Security가 토큰 오류에 빈 본문으로 응답한다) |
+  | 404 | `NOT_FOUND` |
+  | 409 | `CONFLICT` |
+  | 5xx, 502 | `UNKNOWN` |
+  | 응답 없음, 타임아웃 | `NETWORK` |
+
+- **인증 토큰:** 액세스 토큰(30분 JWT)은 메모리에, 리프레시 토큰은 `expo-secure-store`에 둔다. 401을 받으면 `/api/v1/auth/refresh`로 한 번 재발급하고 원래 요청을 한 번 다시 보낸다. 재발급도 실패하면 로그아웃한다.
+- **재발급은 한 번에 하나만:** 백엔드 리프레시 토큰은 한 번 쓰면 사라진다. 요청 여러 개가 동시에 401을 받아도 재발급 요청은 하나만 보내고, 나머지는 그 결과를 기다린다. 동시에 보내면 첫 요청만 성공하고 나머지는 로그아웃된다.
+- **결제:** 토스 결제 화면은 결제 SDK 포트(7-5) 뒤에 둔다. RN 결제위젯 SDK와 웹뷰 결제 페이지(ADR-002 대체안)는 같은 포트의 두 어댑터다. 시크릿 키는 앱에 두지 않고, 앱은 `api.tosspayments.com`을 직접 부르지 않는다. 결제 승인은 백엔드 `/api/v1/payments/confirm`이 한다.
+
+## pstack과 함께 쓰기
+
+작업 흐름은 pstack(`poteto-mode`, architect, tdd, 리뷰 등)을 따른다. 이 스킬은 그 흐름 안에서 앱 코드를 어디에 어떤 모양으로 둘지 정할 때 참고하는 규칙집이다. architect가 "변경이 닿는 시스템"을 추적할 때 이 문서를 함께 읽고, 두 가지 모양을 그릴 때도 둘 다 이 규칙 안에서 그린다.
+
+pstack에 맡기는 것:
+
+- **TypeScript 세부 규칙:** pstack `typescript-best-practices`를 먼저 따른다. 5장은 거기에 없는 보충 규칙만 담는다.
+- **주석:** pstack `no-comments` 기준을 따른다(외부 플랫폼·라이브러리 제약, 공개 API 계약, 라이선스만 남긴다).
+- **나머지 원칙:** 최소 diff, 경계 검증, 판별 유니온, 결과로 증명하기 등은 pstack 그대로다.
+
+pstack 원칙을 덮어쓰는 예외는 두 가지뿐이다.
+
+1. **의도한 경계는 합치지 않는다.** 7-5의 포트(원격 API, 저장소, 네이티브 기능, 결제 SDK, 시간)와 그 어댑터, `core/di`의 composition root는 실제 구현이 하나뿐이어도 Minimize Reader Load나 Laziness Protocol의 인라인 대상이 아니다. 테스트의 페이크가 두 번째 구현이고, 네이티브 모듈을 직접 모킹하지 않으려고 둔 경계다. 그 밖의 전달만 하는 래퍼에는 pstack 원칙을 적용한다.
+2. **컨벤션을 바꾸는 재설계는 제안만 한다.** architect나 Redesign from First Principles가 7-3 폴더 구조나 7-2 레이어 자체를 바꾸는 모양을 고르면 구현하지 않는다. 이유와 두 모양을 정리해 type:decision Issue로 넘기고, 이번 작업은 현재 구조 안에서 진행한다.
+
+domain과 use case를 바꾸면 단위 테스트를 같이 작성하는 규칙([references/testing.md](references/testing.md))은 pstack `tdd`(테스트를 먼저 쓸지)와 별개로 유지한다.
 
 ## 0. 적용 원칙
 
@@ -25,8 +84,10 @@ React Native 앱을 확장 가능하고 테스트하기 쉽게 만드는 범용 
 | 유틸·헬퍼 함수 | 4. 헬퍼 함수 |
 | 타입 정의 | 5. TypeScript |
 | 폴더 구조·레이어 결정 | 7. 아키텍처 |
+| 백엔드 API 호출, 에러, 토큰, 결제 | 백엔드 연동 |
+| pstack 워크플로 안에서 쓸 때 | pstack과 함께 쓰기 |
 | iOS/Android 분기 | 8. 플랫폼별 코드 |
-| 목록이 느림, 버벅임 | 10. 성능 |
+| 목록이 느림, 버벅임 | 10. 성능 ([references/performance.md](references/performance.md)) |
 | 코드 리뷰 | 3, 6, 13 체크리스트 |
 
 ---
@@ -221,7 +282,7 @@ export default function UserDetailRoute() {
 - 화살표 함수보다 **이름 있는 function 선언**을 선호한다 (콜백 인라인은 예외).
 - 함수 이름은 **동작(동사)** 으로: `calculateTotal`, `sendInvite`.
 - 파라미터는 3개 이하. 넘으면 객체 하나로 받는다.
-- **플래그 파라미터 금지.** 분기마다 함수를 나눈다.
+- **플래그 파라미터 금지.** 분기마다 함수를 나눈다. 여기서 플래그는 함수의 동작을 바꾸는 boolean 인자를 말한다. pstack Laziness Protocol의 "결정을 한 곳에서 내리고 결과를 단순한 값으로 넘긴다"는 계산된 결과 값을 넘기는 것이라 이 규칙과 부딪히지 않는다.
 
 ```ts
 // ❌ Don't
@@ -262,7 +323,7 @@ if (!user) {
 ### 3-5. 매직 넘버와 주석
 
 - 매직 넘버는 이름 있는 상수로 뺀다: `const MAX_UPLOAD_MB = 10;`
-- 주석은 **왜**만 쓴다. 무엇을 하는지는 이름으로 드러낸다.
+- 주석은 pstack `no-comments` 기준을 따른다. 무엇을 하는지는 이름으로 드러내고, 주석은 우리가 바꿀 수 없는 외부 제약(플랫폼, 라이브러리, 프로토콜)이나 공개 API 계약에만 쓴다.
 - `console.log`를 커밋하지 않는다. 디버깅용 로그는 지우고, 남겨야 할 로그는 로거를 거친다. 운영 빌드에 그대로 남는다.
 
 ```ts
@@ -323,39 +384,21 @@ const hasAnyError = [emailError, passwordError, nameError].some(Boolean);
 
 ## 5. TypeScript
 
-### 5-1. 타입 안전
+TypeScript 규칙은 pstack `typescript-best-practices`(판별 유니온, 브랜드 타입, `unknown`, `as` 금지, `satisfies`, 경계에서 파싱, 스키마에서 타입 추론, 객체 인자 등)를 먼저 따른다. 아래는 거기에 없는 보충 규칙이다.
 
-- `strict: true`.
-- `any` 금지. 모르는 값은 `unknown`으로 받고 타입 가드로 좁힌다.
-- 서버 응답, `JSON.parse`, 딥링크 파라미터, 저장소에서 읽은 값은 **신뢰하지 않는다**. `unknown`으로 받고 검증한다 (zod 등).
-
-### 5-2. 추론
-
-- 내부 함수의 반환 타입은 추론에 맡긴다.
-- export하는 함수, 포트(인터페이스), 공개 훅은 반환 타입을 명시한다.
-
-### 5-3. interface vs type
-
-- 객체 모양: `interface` (확장·에러 메시지가 낫다).
-- 유니온, 튜플, 원시 타입 별칭, 매핑 타입: `type`.
-- `enum` 대신 문자열 리터럴 유니온: `type OrderStatus = 'pending' | 'paid' | 'cancelled'`.
-
-### 5-4. 유틸리티 타입
-
+- `tsconfig`는 `strict: true`로 둔다.
+- RN에서 신뢰하지 않는 입력: 서버 응답, `JSON.parse`, **딥링크·라우트 파라미터**, **저장소(SecureStore·AsyncStorage)에서 읽은 값**. 모두 경계에서 검증한다.
+- export하는 함수, 포트(인터페이스), 공개 훅은 반환 타입을 명시한다. 내부 함수는 추론에 맡긴다.
+- 객체 모양은 `interface`, 유니온·튜플·원시 타입 별칭·매핑 타입은 `type`으로 쓴다.
+- `enum` 대신 문자열 리터럴 유니온을 쓴다: `type OrderStatus = 'pending' | 'paid' | 'cancelled'`.
 - `null | undefined`는 `Nullable<T>`로 통일한다.
 
 ```ts
 type Nullable<T> = T | null | undefined;
 ```
 
-- `Partial`, `Pick`, `Omit`, `Record`, `ReturnType`을 적극 쓴다. 비슷한 타입을 손으로 복사하지 않는다.
-
-### 5-5. 기타
-
-- 복잡한 공개 함수에는 JSDoc을 단다 (왜, 제약, 예외).
-- 타입 가드로 중복 검사를 없앤다.
-- 서버 DTO와 도메인 타입을 분리한다. 변환은 어댑터(infra)에서 한다.
-- API 스펙(OpenAPI, GraphQL)이 있으면 타입을 생성해서 쓴다. 손으로 쓰지 않는다.
+- 서버 DTO와 도메인 타입을 분리하고, 변환은 어댑터(infrastructure)에서 한다.
+- API 스펙(OpenAPI 등)이 있으면 타입을 생성해서 쓴다. 손으로 쓰지 않는다.
 
 ---
 
@@ -550,32 +593,7 @@ export const userKeys = {
 
 ## 10. 성능
 
-### 10-1. 목록
-
-- 긴 목록은 `FlatList`, `SectionList`, 또는 `FlashList`를 쓴다. `ScrollView` + `map`은 짧고 고정된 목록에만.
-- `keyExtractor`는 안정적인 고유 ID를 쓴다. 인덱스를 key로 쓰지 않는다.
-- `renderItem`의 항목 컴포넌트는 가볍게 두고, 목록이 버벅일 때 `memo`로 감싼다.
-
-### 10-2. 렌더링과 JS 스레드
-
-- 렌더 중에 무거운 계산을 하지 않는다. 필요하면 `useMemo`나 데이터 변환 단계(어댑터·셀렉터)로 옮긴다.
-- `useMemo`, `useCallback`, `memo`는 **측정해서 문제가 보일 때** 쓴다. 습관적으로 감싸지 않는다.
-- 화면 전환 직후의 무거운 작업은 전환이 끝난 뒤로 미룬다.
-- 애니메이션은 JS 스레드가 아니라 UI 스레드에서 돌게 한다 (Reanimated, `useNativeDriver`).
-
-### 10-3. JS 일반 (원본 규칙 유지)
-
-- **반복 조회는 Map/Set으로:** 루프 안의 `array.find` / `includes` 대신 인덱스 Map, Set.
-- **배열 순회 합치기:** `filter().map().filter()`가 큰 배열에서 반복되면 한 번의 순회로.
-- **최솟값·최댓값은 정렬하지 않고** 한 번 순회로.
-- **불변 배열 메서드:** `sort()` 대신 `toSorted()`, `reverse()` 대신 `toReversed()`. 상태 배열을 직접 바꾸면 리렌더가 안 된다.
-- **정규식은 모듈 범위로 끌어올린다.** 함수 안에서 매번 만들지 않는다. 전역 플래그(`g`) 정규식은 상태가 있으니 공유하지 않는다.
-- **저장소 읽기 캐시:** AsyncStorage·MMKV를 같은 값으로 반복 읽지 않는다. 메모리에 캐시하고, 쓸 때 무효화한다.
-
-### 10-4. 리소스
-
-- 이미지는 표시 크기에 맞는 해상도로 받고, 캐시를 지원하는 컴포넌트를 쓴다 (`expo-image`, `react-native-fast-image`).
-- 구독·타이머·리스너는 `useEffect` cleanup에서 반드시 해제한다.
+목록 가상화, 렌더링과 JS 스레드, JS 일반 규칙, 이미지·구독 리소스 관리는 [references/performance.md](references/performance.md)를 봅니다.
 
 ---
 
@@ -584,10 +602,15 @@ export const userKeys = {
 - HTTP·네이티브 에러는 어댑터에서 **앱 에러 타입**으로 바꾼다. 화면은 HTTP 상태 코드나 네이티브 에러 코드를 직접 보지 않는다.
 
 ```ts
-export type AppErrorCode = 'UNAUTHORIZED' | 'NOT_FOUND' | 'NETWORK' | 'PERMISSION_DENIED' | 'UNKNOWN';
+export type AppErrorCode = 'INVALID' | 'UNAUTHORIZED' | 'NOT_FOUND' | 'CONFLICT' | 'NETWORK' | 'PERMISSION_DENIED' | 'UNKNOWN';
 
 export class AppError extends Error {
-  constructor(public readonly code: AppErrorCode, message: string, public readonly cause?: unknown) {
+  constructor(
+    public readonly code: AppErrorCode,
+    message: string,
+    public readonly serverCode?: string, // 백엔드 ErrorResponse.code (예: AMOUNT_MISMATCH)
+    public readonly cause?: unknown,
+  ) {
     super(message);
   }
 }
@@ -604,69 +627,13 @@ export class AppError extends Error {
 
 ## 12. 테스트
 
-| 대상 | 도구 | 방법 |
-|---|---|---|
-| domain, 헬퍼 | Jest | 순수 함수 단위 테스트, 모든 분기 |
-| use case | Jest | 페이크 어댑터 주입, 성공·실패·취소 |
-| 훅 | React Native Testing Library `renderHook` | 페이크 포트를 Provider로 주입 |
-| 컴포넌트·화면 | React Native Testing Library | 로딩·에러·빈 상태, 주요 상호작용 |
-| 사용자 주요 흐름 | E2E (Maestro, Detox 등) | `testID` 기반 |
-
-### 언제 테스트를 작성하나
-
-- `domain/` 함수나 use case를 새로 만들거나 바꾸면, **같은 작업 안에서 단위 테스트를 함께 작성한다.** 요청에 테스트가 없어도 작성한다.
-- 화면·컴포넌트 테스트는 요청이 있을 때만 작성한다.
-- 테스트 실행 환경(Jest 등)이 설정돼 있지 않으면 **직접 설치하지 않는다.** 테스트 파일 작성도 미루고, 작업 결과 보고에 "테스트 환경이 없어 단위 테스트를 작성하지 못했다"와 작성해야 할 대상을 적는다.
-
-### 작성 방법
-
-### 언제 테스트를 작성하나
-
-- `domain/` 함수나 use case를 새로 만들거나 바꾸면, **같은 작업 안에서 단위 테스트를 함께 작성한다.** 요청에 테스트가 없어도 작성한다.
-- 화면·컴포넌트 테스트는 요청이 있을 때만 작성한다.
-- 테스트 실행 환경(Jest 등)이 설정돼 있지 않으면 **직접 설치하지 않는다.** 테스트 파일 작성도 미루고, 작업 결과 보고에 "테스트 환경이 없어 단위 테스트를 작성하지 못했다"와 작성해야 할 대상을 적는다.
-
-### 작성 방법
-
-- 테스트 파일은 대상 옆에 `<파일명>.test.ts(x)`.
-- 네이티브 모듈은 직접 모킹하지 말고 **포트의 페이크**를 쓴다. 포트 덕분에 모킹이 단순해진다.
-
-```ts
-class FakeLocationAdapter implements LocationPort {
-  constructor(private readonly position: Coordinates) {}
-  async getCurrentPosition() {
-    return this.position;
-  }
-}
-```
-
-- RNTL에서는 구현 세부(state, 내부 함수)가 아니라 **사용자에게 보이는 것**(텍스트, 역할, 라벨)으로 찾는다.
-- `testID`를 바꾸면 E2E 시나리오도 같은 변경에서 고친다.
+테스트 도구, 언제 테스트를 작성하는지, 작성 방법은 [references/testing.md](references/testing.md)를 봅니다.
 
 ---
 
 ## 13. 자동 검사
 
-규칙은 사람이 아니라 도구가 먼저 잡게 한다.
-
-- `tsc --noEmit` (strict)
-- ESLint: `@typescript-eslint/no-explicit-any`, `curly`, `no-console`, `import/order`, `react-hooks/rules-of-hooks`, `react-hooks/exhaustive-deps`
-- 레이어 경계: `eslint-plugin-boundaries` 또는 `import/no-restricted-paths`
-
-```js
-'import/no-restricted-paths': ['error', {
-  zones: [
-    // domain은 다른 레이어를 모른다
-    { target: './src/features/*/domain', from: './src/features/*/(presentation|application|infrastructure)' },
-    // application은 presentation·infrastructure를 모른다
-    { target: './src/features/*/application', from: './src/features/*/(presentation|infrastructure)' },
-    // presentation은 infrastructure를 직접 쓰지 않는다
-    { target: './src/features/*/presentation', from: './src/features/*/infrastructure' },
-  ],
-}],
-```
-
-- domain에서 `react`, `react-native`, `expo-*` import를 금지하는 규칙(`no-restricted-imports`)도 함께 둔다.
+`tsc`, ESLint 규칙, 레이어 경계 검사 설정은 [references/automation.md](references/automation.md)를 봅니다.
 
 ---
 
