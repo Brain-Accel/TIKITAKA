@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "editorconfig.editorconfig",
+    "fwcd.kotlin",
+    "vmware.vscode-boot-dev-pack",
+    "vscjava.vscode-gradle",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "expo.vscode-expo-tools",
+    "ms-azuretools.vscode-docker"
+  ]
+}
